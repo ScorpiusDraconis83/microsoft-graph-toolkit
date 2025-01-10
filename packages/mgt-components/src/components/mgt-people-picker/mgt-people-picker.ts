@@ -630,14 +630,19 @@ export class MgtPeoplePicker extends MgtTemplatedTaskComponent {
     }
 
     const selectedPeopleTemplate = this.renderSelectedPeople(this.selectedPeople);
-    const inputTemplate = this.renderInput(selectedPeopleTemplate);
-    const flyoutTemplate = this.renderFlyout(inputTemplate);
 
-    return html`
+    if (this.selectionMode === 'single' && this.selectedPeople.length === 1) {
+      return selectedPeopleTemplate;
+    } else {
+      const inputTemplate = this.renderInput(selectedPeopleTemplate);
+      const flyoutTemplate = this.renderFlyout(inputTemplate);
+
+      return html`
       <div>
         ${flyoutTemplate}
       </div>
     `;
+    }
   }
 
   protected args(): unknown[] {
@@ -693,6 +698,8 @@ export class MgtPeoplePicker extends MgtTemplatedTaskComponent {
         slot="anchor"
         id="people-picker-input"
         role="combobox"
+        aria-live="assertive"
+        aria-atomic="true"
         placeholder=${this.hasMaxSelections ? this.strings.maxSelectionsPlaceHolder : placeholder}
         aria-label=${this.ariaLabel || maxSelectionsAriaLabel || placeholder || this.strings.selectContact}
         aria-expanded=${this.flyout?.isOpen ?? false}
@@ -809,7 +816,7 @@ export class MgtPeoplePicker extends MgtTemplatedTaskComponent {
       mgtHtml`
          <div class="message-parent">
            <mgt-spinner></mgt-spinner>
-           <div aria-label="${this.strings.loadingMessage}" class="loading-text">
+           <div aria-label="${this.strings.loadingMessage}" aria-live="polite" role="alert" class="loading-text">
              ${this.strings.loadingMessage}
            </div>
          </div>
@@ -833,7 +840,7 @@ export class MgtPeoplePicker extends MgtTemplatedTaskComponent {
       this.renderTemplate('no-data', null) ||
       html`
          <div class="message-parent">
-           <div aria-label=${this.strings.noResultsFound} class="search-error-text">
+           <div aria-label=${this.strings.noResultsFound} aria-live="polite" role="alert" class="search-error-text">
              ${this.strings.noResultsFound}
            </div>
          </div>
@@ -857,6 +864,7 @@ export class MgtPeoplePicker extends MgtTemplatedTaskComponent {
         class="searched-people-list"
         role="listbox"
         aria-live="polite"
+        aria-label="${this.strings.suggestionsTitle}"
         title=${this.strings.suggestionsTitle}
       >
         ${repeat(
@@ -941,6 +949,39 @@ export class MgtPeoplePicker extends MgtTemplatedTaskComponent {
       const graph = provider.graph.forComponent(this);
 
       if (!input.length) {
+        if (
+          (this.defaultSelectedUserIds.length > 0 || this.defaultSelectedGroupIds.length > 0) &&
+          !this.selectedPeople.length &&
+          !this.defaultSelectedUsers.length &&
+          !this.defaultSelectedGroups.length
+        ) {
+          this.defaultSelectedUsers = await getUsersForUserIds(
+            graph,
+            this.defaultSelectedUserIds,
+            '',
+            this.userFilters
+          );
+          this.defaultSelectedGroups = await getGroupsForGroupIds(
+            graph,
+            this.defaultSelectedGroupIds,
+            this.peopleFilters
+          );
+
+          this.defaultSelectedGroups = this.defaultSelectedGroups.filter(group => {
+            return group !== null;
+          });
+
+          this.defaultSelectedUsers = this.defaultSelectedUsers.filter(user => {
+            return user !== null;
+          });
+
+          this.selectedPeople = [...this.defaultSelectedUsers, ...this.defaultSelectedGroups];
+
+          if (this.hasMaxSelections) {
+            this.disableTextInput();
+          }
+          this.requestUpdate();
+        }
         if (this.disableSuggestions) {
           this._foundPeople = [];
           return;
@@ -1024,31 +1065,6 @@ export class MgtPeoplePicker extends MgtTemplatedTaskComponent {
           }
           this.defaultPeople = people;
         }
-      }
-
-      if (
-        (this.defaultSelectedUserIds.length > 0 || this.defaultSelectedGroupIds.length > 0) &&
-        !this.selectedPeople.length &&
-        !this.defaultSelectedUsers.length &&
-        !this.defaultSelectedGroups.length
-      ) {
-        this.defaultSelectedUsers = await getUsersForUserIds(graph, this.defaultSelectedUserIds, '', this.userFilters);
-        this.defaultSelectedGroups = await getGroupsForGroupIds(
-          graph,
-          this.defaultSelectedGroupIds,
-          this.peopleFilters
-        );
-
-        this.defaultSelectedGroups = this.defaultSelectedGroups.filter(group => {
-          return group !== null;
-        });
-
-        this.defaultSelectedUsers = this.defaultSelectedUsers.filter(user => {
-          return user !== null;
-        });
-
-        this.selectedPeople = [...this.defaultSelectedUsers, ...this.defaultSelectedGroups];
-        this.requestUpdate();
       }
 
       if (input) {
@@ -1258,7 +1274,9 @@ export class MgtPeoplePicker extends MgtTemplatedTaskComponent {
         this._foundPeople = [];
         this._arrowSelectionCount = -1;
       }
-      this.enableTextInput();
+      if (this._isFocused) {
+        this.enableTextInput();
+      }
     }
   }
 
@@ -1368,6 +1386,8 @@ export class MgtPeoplePicker extends MgtTemplatedTaskComponent {
         this.handleUserSearch();
       }
       this._setAnyEmail = false;
+    } else {
+      this._foundPeople = [];
     }
   };
 

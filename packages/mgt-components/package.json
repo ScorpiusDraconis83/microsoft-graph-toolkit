@@ -1,6 +1,6 @@
 {
   "name": "@microsoft/mgt-components",
-  "version": "3.0.1",
+  "version": "4.4.0",
   "description": "The Microsoft Graph Toolkit Components",
   "keywords": [
     "microsoft graph",
@@ -12,7 +12,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/microsoftgraph/microsoft-graph-toolkit"
+    "url": "git+https://github.com/microsoftgraph/microsoft-graph-toolkit.git"
   },
   "author": "Microsoft",
   "license": "MIT",
@@ -27,22 +27,22 @@
     "build": "npm-run-all clean build:compile",
     "build:compile": "npm-run-all sass compile",
     "build:watch": "npm-run-all -p sass:watch compile:watch",
-    "clean": "shx rm -rf ./dist && shx rm -rf ./tsconfig.tsbuildinfo && shx rm 'src/**/*-css.ts' || shx true",
+    "clean": "shx rm -rf ./dist && shx rm -rf ./tsconfig.tsbuildinfo && shx rm \"src/**/*-css.ts\" || shx true",
     "compile": "tsc -b",
     "compile:watch": "tsc -w",
-    "lint": "eslint -c ../../.eslintrc.js 'src/**/*.ts'",
+    "lint": "eslint -c ../../.eslintrc.js \"src/**/*.ts\"",
     "postpack": "cpx *.tgz ../../artifacts",
     "sass": "node ./scripts/compileSass.js",
     "sass:watch": "nodemon -e scss -x npm run sass"
   },
   "sideEffects": false,
   "dependencies": {
-    "@fluentui/web-components": "^2.5.16",
+    "@fluentui/web-components": "^2.6.1",
     "@lit/task": "^1.0.0",
     "@microsoft/mgt-element": "*",
-    "@microsoft/microsoft-graph-client": "3.0.2",
+    "@microsoft/microsoft-graph-client": "3.0.7",
     "@microsoft/microsoft-graph-types": "^2.40.0",
-    "@microsoft/microsoft-graph-types-beta": "^0.29.0-preview",
+    "@microsoft/microsoft-graph-types-beta": "^0.43.0-preview",
     "lit": "^3.1.2",
     "office-ui-fabric-core": "^11.1.0"
   },

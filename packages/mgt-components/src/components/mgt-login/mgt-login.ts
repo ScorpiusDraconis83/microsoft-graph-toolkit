@@ -241,14 +241,18 @@ export class MgtLogin extends MgtTemplatedTaskComponent {
     }
 
     const provider = Providers.globalProvider;
-    if (provider?.isMultiAccountSupportedAndEnabled) {
-      localStorage.removeItem(provider.getActiveAccount().id + this._userDetailsKey);
-    }
     if (provider?.logout) {
       await provider.logout();
+    }
+  };
+
+  private readonly completeLogout = () => {
+    const provider = Providers.globalProvider;
+    if (provider.state === ProviderState.SignedOut) {
       this.userDetails = null;
       if (provider.isMultiAccountSupportedAndEnabled) {
-        localStorage.removeItem(provider.getActiveAccount().id + this._userDetailsKey);
+        const activeAccount = provider.getActiveAccount();
+        localStorage.removeItem(activeAccount?.id + this._userDetailsKey);
       }
       this.hideFlyout();
       this.fireCustomEvent('logoutCompleted');
@@ -299,6 +303,9 @@ export class MgtLogin extends MgtTemplatedTaskComponent {
         }
         this.fireCustomEvent('loginCompleted');
       } else {
+        if (provider.logout) {
+          this.completeLogout();
+        }
         this.userDetails = null;
       }
     }
@@ -728,7 +735,7 @@ export class MgtLogin extends MgtTemplatedTaskComponent {
    * @memberof MgtLogin
    */
   private readonly onClick = (): void => {
-    if (this.userDetails && this._isFlyoutOpen) {
+    if (this.userDetails && this.flyout.isOpen) {
       this.hideFlyout();
     } else if (this.userDetails) {
       this.showFlyout();

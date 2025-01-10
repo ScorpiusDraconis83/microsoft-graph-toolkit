@@ -1,6 +1,6 @@
 {
   "name": "@microsoft/mgt",
-  "version": "3.0.1",
+  "version": "4.4.0",
   "description": "The Microsoft Graph Toolkit",
   "keywords": [
     "microsoft graph",
@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/microsoftgraph/microsoft-graph-toolkit"
+    "url": "git+https://github.com/microsoftgraph/microsoft-graph-toolkit.git"
   },
   "author": "Microsoft",
   "license": "MIT",
@@ -33,7 +33,7 @@
     "clean": "shx rm -rf ./dist && shx rm -rf ./tsconfig.tsbuildinfo",
     "compile": "tsc -b",
     "compile:watch": "tsc -w",
-    "lint": "eslint -c ../../.eslintrc.js 'src/**/*.ts'",
+    "lint": "eslint -c ../../.eslintrc.js \"src/**/*.ts\"",
     "postpack": "cpx *.tgz ../../artifacts",
     "rollup": "rollup -c"
   },

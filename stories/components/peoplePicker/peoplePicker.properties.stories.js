@@ -41,6 +41,12 @@ export const singleSelectMode = () => html`
     <button aria-label="close modal" id="close-modal">X</button>
 </div>
 
+<h2> Single select with default selected user Ids</h2>
+<mgt-people-picker default-selected-user-ids="e3d0513b-449e-4198-ba6f-bd97ae7cae85" selection-mode="single"></mgt-people-picker>
+
+<h2> Single select with default selected group Ids</h2>
+<mgt-people-picker default-selected-group-ids="94cb7dd0-cb3b-49e0-ad15-4efeb3c7d3e9" selection-mode="single"></mgt-people-picker>
+
 <style>
 #modal-content {
   height: 200px;
@@ -59,149 +65,101 @@ const closeModal = document.getElementById("close-modal")
 const modalContent = document.getElementById("modal-content")
 const modalPicker = document.getElementById("modal-picker")
 modal.addEventListener('click', () => {
-    modalContent.style.display = "flex"
-    modalPicker.selectedPeople = []
+  modalContent.style.display = "flex"
+  modalPicker.selectedPeople = []
+  const input = modalPicker.shadowRoot.querySelector('fluent-text-field').shadowRoot.querySelector('input');
+  input.focus();
 })
 
 closeModal.addEventListener('click', () => {
-    modalContent.style.display = "none"
+  modalContent.style.display = "none";
+  modal.focus();
 })
 </script>
 `;
 
 export const disableSuggestions = () => html`
-  <mgt-people-picker disable-suggestions></mgt-people-picker>
+<h1>Disable suggestions</h1>
+<mgt-people-picker disable-suggestions></mgt-people-picker>
+<h1>Disable suggestions with default selected user Ids</h1>
+<mgt-people-picker
+default-selected-user-ids="e3d0513b-449e-4198-ba6f-bd97ae7cae85, 40079818-3808-4585-903b-02605f061225" disable-suggestions>
+</mgt-people-picker>
+
+
+  
 `;
 
 export const dynamicGroupId = () => html`
-  <mgt-people-picker id="picker"></mgt-people-picker>
-  <div>
-    <p class="notes">Pick a group:</p>
-    <div class="groups">
-      <button aria-label="Select a group" id="showHideGroups">Select a group</button>
-      <ul id="groupChooser"></ul>
-    </div>
-    <p class="notes">People chosen:</p>
-    <div id="chosenPeople"></div>
-  </div>
+<div class="groups">
+  <label class="notes">Pick a group:
+    <select id="groupChooser">
+        <option></option>
+    </select>
+  </label>
+</div>
+<mgt-people-picker id="picker"></mgt-people-picker>
 
-  <style>
-    body {
-      font-family: 'Segoe UI', 'Segoe UI Web (West European)', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto,
-        'Helvetica Neue', sans-serif;
-    }
 
-    .notes {
-      font-size: 12px;
-      margin-bottom: 2px;
-    }
-    .groups {
-      max-width: 200px;
-    }
+<style>
+  .notes {
+    font-size: 12px;
+  }
 
-    #showHideGroups {
-      background-color: #287ab1;
-      color: white;
-      padding: 8px;
-      font-size: 16px;
-      border: none;
-      cursor: pointer;
-      width: 100%;
-    }
+  .groups {
+    max-width: 200px;
+    margin-bottom: 16px;
+  }
 
-    #showHideGroups:hover, #showHideGroups:focus{
-      background-color: #4488EC;
-    }
+  #groupChooser {
+    position: inherit;
+    width: 100%;
+    max-height: 300px;
+    overflow: scroll;
+    padding-left: 3px;
+  }
+</style>
+<script type="module">
+import { Providers, ProviderState } from '@microsoft/mgt-element';
 
-    #groupChooser {
-      display: none;
-      position: inherit;
-      background-color: #f1f1f1;
-      width: 100%;
-      box-shadow: 0px 8px 8px 0px rgba(0,0,0,0.2);
-      max-height: 300px;
-      overflow: scroll;
-      padding-left: 3px;
-    }
-    ul{
-      margin: 0px;
-      display: inherit;
-    }
-    ul > li {
-      color: black;
-      text-decoration: none;
-      display: block;
-      border-bottom: 1px solid;
-      font-size: 12px;
-      cursor: pointer;
-    }
-    ul > li:hover, ul > li:focus {
-      background-color: lightgray;
-    }
-  </style>
-  <script type="module">
-    import { Providers, ProviderState } from '@microsoft/mgt-element';
+let picker = document.getElementById('picker');
+let groupChooser = document.getElementById('groupChooser');
 
-    let picker = document.getElementById('picker');
-    let chosenArea = document.getElementById('chosenPeople');
-    let groupChooser = document.getElementById('groupChooser');
-    let button = document.getElementById('showHideGroups');
-    button.addEventListener("click", showHideGroups);
 
-    loadGroups();
-    Providers.onProviderUpdated(loadGroups);
+loadGroups();
+Providers.onProviderUpdated(loadGroups);
 
-    function showHideGroups(){
-      const display = groupChooser.style.display;
-      if (display === "none"|| display === "") {
-          groupChooser.style.display = "inline-block";
-      } else {
-          groupChooser.style.display = "none";
-      }
-    }
-    function loadGroups() {
-      let provider = Providers.globalProvider;
-      if (provider && provider.state === ProviderState.SignedIn) {
-        let client = provider.graph.client;
+function loadGroups() {
+  let provider = Providers.globalProvider;
+  if(provider && provider.state === ProviderState.SignedIn) {
+    let client = provider.graph.client;
 
-        client
-          .api('/groups')
-          .get()
-          .then(groups => {
-            for (let group of groups.value) {
-              const id = group.id;
-              let option = document.createElement('li');
-              option.setAttribute("value", id);
-              option.innerText = group.displayName;
-              option.onclick = function(event){
-                const id = event.target.getAttribute("value");
-                const displayName = event.target.innerText.trim();
-                button.innerText = displayName;
-                setGroupValue(id);
-                showHideGroups();
-              }
+    client
+      .api('/groups')
+      .get()
+      .then(groups => {
+        for(let group of groups.value) {
+          const id = group.id;
+          let option = document.createElement('option');
+          option.setAttribute("value", id);
+          option.innerText = group.displayName;
+          groupChooser.appendChild(option);
+        }
+      });
+  }
+}
 
-              groupChooser.appendChild(option);
-            }
-          });
-      }
-    }
+function setGroupValue(selected) {
+  picker.setAttribute('group-id', selected);
+}
 
-    picker.addEventListener('selectionChanged', function(e) {
-      //reset area
-      chosenArea.innerHTML = '';
-      //render selected people to chosen people div
-      for (var i = 0; i < e.detail.length; i++) {
-        let newElem = document.createElement('div');
-        newElem.innerHTML = e.detail[i].displayName + ' ' + e.detail[i].id;
-        chosenArea.append(newElem);
-      }
-    });
-
-    function setGroupValue(selected) {
-      picker.setAttribute('group-id', selected);
-    }
-  </script>
+groupChooser.addEventListener('change', function(e) {
+  const selection = e.target.value;
+  if (selection !== -1) {
+      setGroupValue(selection);
+  }
+});
+</script>
 `;
 
 export const pickPeopleAndGroups = () => html`
@@ -226,6 +184,11 @@ export const pickDistributionGroups = () => html`
 
 export const pickMultipleGroups = () => html`
   <mgt-people-picker type="group" group-type="unified,distribution,security"></mgt-people-picker>
+  <!-- group-type can be "any", "unified", "security", "mailenabledsecurity", "distribution" -->
+`;
+
+export const pickMultipleGroupsShowMax = () => html`
+  <mgt-people-picker type="group" group-type="unified,security,mailenabledsecurity" show-max="3"></mgt-people-picker>
   <!-- group-type can be "any", "unified", "security", "mailenabledsecurity", "distribution" -->
 `;
 

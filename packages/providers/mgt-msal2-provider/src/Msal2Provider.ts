@@ -24,7 +24,8 @@ import {
   InteractionRequiredAuthError,
   SsoSilentRequest,
   EventMessage,
-  AuthenticationResult
+  AuthenticationResult,
+  BrowserAuthError
 } from '@azure/msal-browser';
 import { AuthenticationProviderOptions } from '@microsoft/microsoft-graph-client';
 
@@ -476,8 +477,24 @@ export class Msal2Provider extends IProvider {
       domainHint: this._domainHint
     };
     if (this._loginType === LoginType.Popup) {
-      const response = await this._publicClientApplication.loginPopup(loginRequest);
-      this.handleResponse(response?.account);
+      try {
+        const response = await this._publicClientApplication.loginPopup(loginRequest);
+        this.handleResponse(response?.account);
+      } catch (error) {
+        switch (true) {
+          case error instanceof BrowserAuthError && error.errorCode === 'user_cancelled':
+            console.warn('🦒: User cancelled the login flow.');
+            this.setState(ProviderState.SignedOut);
+            break;
+          case error instanceof BrowserAuthError && error.errorCode === 'interaction_in_progress':
+            console.warn('🦒: Login already in progess. Close the popup to login again.');
+            this.setState(ProviderState.SignedOut);
+            break;
+          default:
+            console.error('🦒: Error occurred during login:', error);
+            throw error;
+        }
+      }
     } else {
       const loginRedirectRequest: RedirectRequest = { ...loginRequest };
       await this._publicClientApplication.loginRedirect(loginRedirectRequest);
@@ -531,12 +548,16 @@ export class Msal2Provider extends IProvider {
    */
   public getActiveAccount() {
     const account = this._publicClientApplication.getActiveAccount();
-    return {
-      name: account.name,
-      mail: account.username,
-      id: account.homeAccountId,
-      tenantId: account.tenantId
-    } as IProviderAccount;
+
+    if (account) {
+      return {
+        name: account.name,
+        mail: account.username,
+        id: account.homeAccountId,
+        tenantId: account.tenantId
+      } as IProviderAccount;
+    }
+    return undefined;
   }
 
   /**
@@ -729,8 +750,8 @@ export class Msal2Provider extends IProvider {
    * @return {*}  {Promise<string>}
    * @memberof Msal2Provider
    */
-  public async getAccessToken(options?: AuthenticationProviderOptions): Promise<string> {
-    const scopes = options ? options.scopes || this.scopes : this.scopes;
+  public async getAccessToken(opts?: AuthenticationProviderOptions): Promise<string> {
+    const scopes = opts?.scopes?.length ? opts.scopes : this.scopes;
     const accessTokenRequest: SilentRequest = {
       scopes,
       account: this.getAccount()

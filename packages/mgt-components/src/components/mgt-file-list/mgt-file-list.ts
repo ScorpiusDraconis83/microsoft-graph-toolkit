@@ -10,9 +10,11 @@ import {
   Providers,
   ProviderState,
   mgtHtml,
-  MgtTemplatedTaskComponent
+  MgtTemplatedTaskComponent,
+  registerComponent,
+  customElementHelper
 } from '@microsoft/mgt-element';
-import { DriveItem } from '@microsoft/microsoft-graph-types';
+import { DriveItem, SharedInsight } from '@microsoft/microsoft-graph-types';
 import { html, TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
@@ -46,7 +48,8 @@ import { MgtFileUploadConfig, registerMgtFileUploadComponent } from './mgt-file-
 import { fluentProgressRing } from '@fluentui/web-components';
 import { registerFluentComponents } from '../../utils/FluentComponents';
 import { CardSection } from '../BasePersonCardSection';
-import { registerComponent } from '@microsoft/mgt-element';
+import { getRelativeDisplayDate } from '../../utils/Utils';
+import { getFileTypeIconUri } from '../../styles/fluent-icons';
 
 export const registerMgtFileListComponent = () => {
   registerFluentComponents(fluentProgressRing);
@@ -54,6 +57,10 @@ export const registerMgtFileListComponent = () => {
   registerMgtFileComponent();
   registerMgtFileUploadComponent();
   registerComponent('file-list', MgtFileList);
+};
+
+const isSharedInsight = (sharedInsightFile: SharedInsight): sharedInsightFile is SharedInsight => {
+  return 'lastShared' in sharedInsightFile;
 };
 
 /**
@@ -95,6 +102,10 @@ export class MgtFileList extends MgtTemplatedTaskComponent implements CardSectio
   protected get strings(): Record<string, string> {
     return strings;
   }
+
+  // files from the person card component
+  @state()
+  private _personCardFiles: DriveItem[];
 
   /**
    * allows developer to provide query for a file list
@@ -369,8 +380,9 @@ export class MgtFileList extends MgtTemplatedTaskComponent implements CardSectio
 
   @state() private _isLoadingMore: boolean;
 
-  constructor() {
+  constructor(files?: DriveItem[]) {
     super();
+    this._personCardFiles = files;
   }
 
   /**
@@ -381,6 +393,7 @@ export class MgtFileList extends MgtTemplatedTaskComponent implements CardSectio
   protected clearState(): void {
     super.clearState();
     this.files = null;
+    this._personCardFiles = null;
   }
 
   /**
@@ -439,6 +452,9 @@ export class MgtFileList extends MgtTemplatedTaskComponent implements CardSectio
   protected renderContent = () => {
     if (!this.files || this.files.length === 0) {
       return this.renderNoData();
+    }
+    if (this._personCardFiles) {
+      this.files = this._personCardFiles;
     }
     return this._isCompact ? this.renderCompactView() : this.renderFullView();
   };
@@ -501,6 +517,7 @@ export class MgtFileList extends MgtTemplatedTaskComponent implements CardSectio
           class="file-list"
         >
           <li
+            id="file-list-item-${this.files[0].id}"
             tabindex="0"
             class="file-item"
             @keydown="${this.onFileListKeyDown}"
@@ -513,6 +530,7 @@ export class MgtFileList extends MgtTemplatedTaskComponent implements CardSectio
             f => f.id,
             f => html`
               <li
+                id="file-list-item-${f.id}"
                 class="file-item"
                 @keydown="${this.onFileListKeyDown}"
                 @click=${(e: UIEvent) => this.handleItemSelect(f, e)}>
@@ -540,14 +558,52 @@ export class MgtFileList extends MgtTemplatedTaskComponent implements CardSectio
    * @returns {TemplateResult}
    * @memberof mgtFileList
    */
-  protected renderFile(file: DriveItem): TemplateResult {
+  protected renderFile(file: DriveItem | SharedInsight): TemplateResult {
     const view = this.itemView;
+    // if file is type SharedInsight, render Shared Insight File
+    if (isSharedInsight(file)) {
+      return this.renderSharedInsightFile(file);
+    }
     return (
       this.renderTemplate('file', { file }, file.id) ||
       mgtHtml`
         <mgt-file class="mgt-file-item" .fileDetails=${file} .view=${view}></mgt-file>
       `
     );
+  }
+
+  /**
+   * Render a file item of Shared Insight Type
+   *
+   * @protected
+   * @param {IFile} file
+   * @returns {TemplateResult}
+   * @memberof MgtFileList
+   */
+  protected renderSharedInsightFile(file: SharedInsight): TemplateResult {
+    const lastModifiedTemplate = file.lastShared
+      ? html`
+          <div class="shared_insight_file__last-modified">
+            ${this.strings.sharedTextSubtitle} ${getRelativeDisplayDate(new Date(file.lastShared.sharedDateTime))}
+          </div>
+        `
+      : null;
+
+    return html`
+      <div class="shared_insight_file" @click=${(e: MouseEvent) => this.handleSharedInsightClick(file, e)} tabindex="0">
+        <div class="shared_insight_file__icon">
+          <img alt="${file.resourceVisualization.title}" src=${getFileTypeIconUri(
+            file.resourceVisualization.type,
+            48,
+            'svg'
+          )} />
+        </div>
+        <div class="shared_insight_file__details">
+          <div class="shared_insight_file__name">${file.resourceVisualization.title}</div>
+          ${lastModifiedTemplate}
+        </div>
+      </div>
+    `;
   }
 
   /**
@@ -612,7 +668,13 @@ export class MgtFileList extends MgtTemplatedTaskComponent implements CardSectio
    * @param event
    */
   private readonly onFileListKeyDown = (event: KeyboardEvent): void => {
-    const fileList = this.renderRoot.querySelector('.file-list');
+    const target = event.target as HTMLElement;
+    let fileList: HTMLElement;
+    if (!target.classList) {
+      fileList = this.renderRoot.querySelector('.file-list-children');
+    } else {
+      fileList = this.renderRoot.querySelector('.file-list');
+    }
     let focusedItem: HTMLElement;
 
     if (!fileList?.children.length) {
@@ -769,6 +831,18 @@ export class MgtFileList extends MgtTemplatedTaskComponent implements CardSectio
         this.files = files;
       }
     }
+    for (const file of this.files) {
+      if (file?.folder?.childCount > 0) {
+        // expand the file with children
+        const driveId = file?.parentReference?.driveId;
+        const itemId = file?.id;
+        const iterator = await getDriveFilesByIdIterator(graph, driveId, itemId, 5);
+        if (iterator) {
+          const children = [...iterator.value];
+          file.children = children;
+        }
+      }
+    }
   }
 
   /**
@@ -841,11 +915,51 @@ export class MgtFileList extends MgtTemplatedTaskComponent implements CardSectio
     this.requestUpdate();
   }
 
-  private handleFileClick(file: DriveItem) {
+  private readonly handleSharedInsightClick = (file: SharedInsight, e?: MouseEvent) => {
+    if (file.resourceReference?.webUrl && !this.disableOpenOnClick) {
+      e.preventDefault();
+      window.open(file.resourceReference.webUrl, '_blank', 'noreferrer');
+    }
+  };
+
+  private readonly handleFileClick = (file: DriveItem) => {
+    const hasChildFolders = file?.folder?.childCount > 0 && file?.children;
+    // the item has child folders, on click should get the child folders and render them
+    if (hasChildFolders) {
+      this.showChildren(file.id);
+      return;
+    }
+
     if (file?.webUrl && !this.disableOpenOnClick) {
       window.open(file.webUrl, '_blank', 'noreferrer');
     }
-  }
+  };
+
+  private readonly showChildren = (fileId: string) => {
+    const itemDOM = this.renderRoot.querySelector(`#file-list-item-${fileId}`);
+    this.renderChildren(fileId, itemDOM);
+  };
+
+  private readonly renderChildren = (itemId: string, itemDOM: Element) => {
+    const fileListName = customElementHelper.isDisambiguated
+      ? `${customElementHelper.prefix}-file-list`
+      : 'mgt-file-list';
+    const childrenContainer = this.renderRoot.querySelector(`#file-list-children-${itemId}`);
+    if (!childrenContainer) {
+      const fl = document.createElement(fileListName);
+      fl.setAttribute('item-id', itemId);
+      fl.setAttribute('id', `file-list-children-${itemId}`);
+      fl.setAttribute('class', 'file-list-children-show');
+      itemDOM.after(fl);
+    } else {
+      // toggle to show/hide the children container
+      if (childrenContainer.classList.contains('file-list-children-hide')) {
+        childrenContainer.setAttribute('class', 'file-list-children-show');
+      } else {
+        childrenContainer.setAttribute('class', 'file-list-children-hide');
+      }
+    }
+  };
 
   /**
    * Get file extension string from file name
